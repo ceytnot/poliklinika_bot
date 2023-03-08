@@ -1,0 +1,9 @@
+CONSTANTS.py
+poliklinili_bot.service
+TEST.py
+TEST2.py
+TEST_async.py
+TEST_POKEMON.py
+TEST_send_message.py
+.idea
+__pycache__
