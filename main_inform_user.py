@@ -44,12 +44,14 @@ sql_update_user_tbl = "UPDATE users_tbl SET done = 1 WHERE " \
                       "doc_real_id = %s and " \
                       "done = 0"
 
+
 async def aiohttp_session(chat_id, poliklinik_id, poliklinik_name, doctor_spec, doctor_spec_id, doc_real_name,
-                          doctor_id, district, district_id, url_json_doctors, sess_, cursor):
+                          doctor_id, district, district_id, url_json_doctors, sess_):
     async with sess_.get(url=url_json_doctors) as response:
         print(district)
         print(poliklinik_name)
         print(doctor_id)
+        print(doc_real_name)
         if response.status == 200:
             doctors_json = await response.json(content_type=None)
             doctors_json = doctors_json['result']
@@ -63,32 +65,28 @@ async def aiohttp_session(chat_id, poliklinik_id, poliklinik_name, doctor_spec, 
 
                     if tickets > 0:
                         async with telegram.Bot(TELEGA_TOKEN):
-                            await telegram.Bot(TELEGA_TOKEN).send_message(text=f'ПОЯВИЛИСЬ НОМЕРКИ!\n'
-                                                        f'{district} район\n'
-                                                        f'{poliklinik_name}\n'
-                                                        f'{doctor_spec}\n'
-                                                        f'{doc_real_name}\n'
-                                                        f'Доступное количество: {tickets}\n'
-                                                        f'Ближайшая дата: {nearest_date}\n\n'
-                                                        'Пройдите по ссылке для записи:'
-                                                        f'"https://gorzdrav.spb.ru/service-free-schedule#%5B%7B%22'
-                                                        f'district%22:%22{district_id}%22%7D,%7B%22'
-                                                        f'lpu%22:%22{poliklinik_id}%22%7D,%7B%22'
-                                                        f'speciality%22:%22{doctor_id}%22%7D%5D"\n\n'
-                                                        f'Заявка отработана. Для установки новой заявки нажмите ==> /start',
-                                                        chat_id=chat_id)
-                            # clear users_tbl where tickets > 0 as one time inform is enought but keep rows with tickets == 0
+                            await telegram.Bot(TELEGA_TOKEN).send_message(
+                                text=f'ПОЯВИЛИСЬ НОМЕРКИ!\n'
+                                     f'{district} район\n'
+                                     f'{poliklinik_name}\n'
+                                     f'{doctor_spec}\n'
+                                     f'{doc_real_name}\n'
+                                     f'Доступное количество: {tickets}\n'
+                                     f'Ближайшая дата: {nearest_date}\n\n'
+                                     f'Пройдите по ссылке для записи:'
+                                     f'"https://gorzdrav.spb.ru/service-free-schedule#%5B%7B%22'
+                                     f'district%22:%22{district_id}%22%7D,%7B%22'
+                                     f'lpu%22:%22{poliklinik_id}%22%7D,%7B%22'
+                                     f'speciality%22:%22{doctor_spec_id}%22%7D,'
+                                     f'%7B%22doctor%22:%22{doctor_id}%22%7D%5D"\n\n'
+                                     f'Заявка отработана. Для установки новой заявки '
+                                     f'нажмите ==> /start', chat_id=chat_id)
+
+                    # clear users_tbl where tickets > 0 as one time inform is enough but keep rows with tickets == 0
                         async with await psycopg.AsyncConnection.connect(POSTGRES_PWD) as aconn:
                             async with aconn.cursor() as cur:
                                 await cur.execute(sql_update_user_tbl, (chat_id, doctor_id))
                                 await aconn.commit()
-
-
-
-
-
-                    #return chat_id, poliklinik_id, poliklinik_name, doctor_spec, doctor_spec_id, doc_real_name, \
-                    #       doctor_id, district, district_id, tickets, nearest_date, sess_
 
         return sess_
 
@@ -100,7 +98,8 @@ async def gorzdrav_response():
             # joined_tbl acts as dict (because psycopg2 returns type RealDictCursor)
             chat_id = int(rows['chat_id'])  # 5252203179
             poliklinik_id = rows['poliklinik_id']
-            poliklinik_name = rows['poliklinik_request']  # Городская поликлиника №52" Отделение общей врачебной практики
+            poliklinik_name = rows[
+                'poliklinik_request']  # Городская поликлиника №52" Отделение общей врачебной практики
             doctor_spec = rows['doctor_request']  # Педиатр
             doctor_spec_id = rows['doctor_id'].replace("+", "%2B").replace("/", "%2F").replace("=", "%3D")
             doc_real_name = rows['doc_real_name']  # Черная Инесса Владимировна
@@ -114,7 +113,7 @@ async def gorzdrav_response():
             get_doctors_list.append(asyncio.ensure_future(aiohttp_session(chat_id, poliklinik_id, poliklinik_name,
                                                                           doctor_spec, doctor_spec_id, doc_real_name,
                                                                           doctor_id, district, district_id,
-                                                                          url_json_doctors, sess, cursor)))
+                                                                          url_json_doctors, sess)))
 
             got_doctors_full_list = await asyncio.gather(*get_doctors_list, return_exceptions=True)
 
@@ -123,8 +122,6 @@ async def gorzdrav_response():
 
 async def main():
     await gorzdrav_response()
-
-
 
 
 if platform == "win32":
